@@ -1,9 +1,8 @@
 import gradio as gr
 import matplotlib.pyplot as plt
-import time
 
 
-# MERGE SORT WITH FRAME CAPTURE
+# MERGE SORT
 
 
 def merge(left, right, key, frames):
@@ -79,20 +78,20 @@ def plot_frame(frame, key):
 
 
 def sort_playlist(titles, artists, energies, durations, sort_key):
+    # Validate equal lengths
+    if not (len(titles) == len(artists) == len(energies) == len(durations)):
+        yield "Error: All lists must have the same number of items.", None
+        return
+
     playlist = []
 
     for t, a, e, d in zip(titles, artists, energies, durations):
-        if t.strip() == "":
-            continue
         playlist.append({
             "title": t,
             "artist": a,
             "energy": int(e),
             "duration": int(d)
         })
-
-    if len(playlist) == 0:
-        yield "No songs entered!", None
 
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
@@ -136,10 +135,20 @@ with gr.Blocks() as demo:
     def parse_csv(text):
         return [x.strip() for x in text.split(",")]
 
+    def run_sort(t, a, e, d, key):
+        return sort_playlist(
+            parse_csv(t),
+            parse_csv(a),
+            parse_csv(e),
+            parse_csv(d),
+            key
+        )
+
     sort_button.click(
-        sort_playlist,
+        run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
-        outputs=[final_output, plot_output]
+        outputs=[final_output, plot_output],
+        stream=True
     )
 
 demo.launch()
