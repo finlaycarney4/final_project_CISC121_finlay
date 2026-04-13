@@ -13,14 +13,15 @@ def merge(left, right, key, frames):
     merged = []
     i = j = 0
 
-    # Compare elements from both halves
     while i < len(left) and j < len(right):
+        # Capture comparison frame
         frames.append({
             "data": merged + left[i:] + right[j:],
             "highlight": (left[i], right[j]),
             "message": f"Comparing {left[i]['title']} and {right[j]['title']}"
         })
 
+        # Standard merge logic
         if left[i][key] <= right[j][key]:
             merged.append(left[i])
             i += 1
@@ -28,16 +29,18 @@ def merge(left, right, key, frames):
             merged.append(right[j])
             j += 1
 
+        # Capture post‑move frame
         frames.append({
             "data": merged + left[i:] + right[j:],
             "highlight": None,
             "message": "Moved item into merged list"
         })
 
-    # Append remaining items (no comparisons needed)
+    # Append remaining items
     merged.extend(left[i:])
     merged.extend(right[j:])
 
+    # Final frame for this merge step
     frames.append({
         "data": merged.copy(),
         "highlight": None,
@@ -48,7 +51,6 @@ def merge(left, right, key, frames):
 
 
 def merge_sort(arr, key, frames):
-    # Base case: size 0 or 1 is already sorted
     if len(arr) <= 1:
         return arr
 
@@ -61,14 +63,14 @@ def merge_sort(arr, key, frames):
 # ============================================================
 # FRAME VISUALIZATION
 # ------------------------------------------------------------
-# Converts a single merge-sort frame into a bar chart figure.
+# Converts a merge‑sort frame into a bar chart figure.
 # Handles empty data safely.
 # ============================================================
 
 def plot_frame(frame, key):
     data = frame["data"]
 
-    # Empty playlist → show placeholder figure
+    # Empty playlist → placeholder figure
     if not data:
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No data to display", ha="center", va="center", fontsize=14)
@@ -99,8 +101,10 @@ def plot_frame(frame, key):
 # ============================================================
 # SORT PIPELINE (STREAMING GENERATOR)
 # ------------------------------------------------------------
-# This function ALWAYS yields (text, plot) pairs.
-# This is critical for Gradio streaming to work correctly.
+# IMPORTANT:
+#   • This function ALWAYS yields (text, plot) pairs.
+#   • This is required for Gradio streaming to work.
+#   • All error messages must be yielded, not returned.
 # ============================================================
 
 def safe_int(x):
@@ -136,7 +140,7 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
 
-    # Stream each animation frame
+    # Stream animation frames
     for frame in frames:
         yield frame["message"], plot_frame(frame, sort_key)
 
@@ -162,7 +166,7 @@ def parse_csv(text):
 
 
 def run_sort(t, a, e, d, key):
-    # IMPORTANT: Always return the generator itself.
+    # Always return the generator itself
     return sort_playlist(
         parse_csv(t),
         parse_csv(a),
