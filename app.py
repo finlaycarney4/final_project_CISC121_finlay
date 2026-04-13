@@ -1,8 +1,9 @@
 import gradio as gr
 import matplotlib.pyplot as plt
+import time
 
 
-# MERGE SORT
+# MERGE SORT WITH FRAME CAPTURE
 
 
 def merge(left, right, key, frames):
@@ -13,7 +14,8 @@ def merge(left, right, key, frames):
         # Record comparison frame
         frames.append({
             "data": merged + left[i:] + right[j:],
-            "highlight": (left[i], right[j])
+            "highlight": (left[i], right[j]),
+            "message": f"Comparing {left[i]['title']} and {right[j]['title']}"
         })
 
         if left[i][key] <= right[j][key]:
@@ -26,13 +28,19 @@ def merge(left, right, key, frames):
         # Record after-move frame
         frames.append({
             "data": merged + left[i:] + right[j:],
-            "highlight": None
+            "highlight": None,
+            "message": "Moved item into merged list"
         })
 
     merged.extend(left[i:])
     merged.extend(right[j:])
 
-    frames.append({"data": merged.copy(), "highlight": None})
+    frames.append({
+        "data": merged.copy(),
+        "highlight": None,
+        "message": "Merged section complete"
+    })
+
     return merged
 
 
@@ -73,15 +81,14 @@ def plot_frame(frame, key):
     return plt
 
 
-
+# -----------------------------
 # SORT + ANIMATION LOGIC
-
+# -----------------------------
 
 def sort_playlist(titles, artists, energies, durations, sort_key):
     # Validate equal lengths
     if not (len(titles) == len(artists) == len(energies) == len(durations)):
-        yield "Error: All lists must have the same number of items.", None
-        return
+        return "Error: All lists must have the same number of items.", None
 
     playlist = []
 
@@ -96,10 +103,14 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
 
-    # Animate frames
+    # Animation loop
     for frame in frames:
         plt_frame = plot_frame(frame, sort_key)
-        yield "Sorting...", plt_frame
+        yield (
+            frame["message"],
+            plt_frame
+        )
+        time.sleep(0.6)
 
     # Final sorted playlist text
     final_text = "\n".join(
@@ -108,6 +119,7 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     )
 
     final_plot = plot_frame({"data": sorted_list, "highlight": None}, sort_key)
+
     yield final_text, final_plot
 
 
@@ -147,8 +159,7 @@ with gr.Blocks() as demo:
     sort_button.click(
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
-        outputs=[final_output, plot_output],
-        stream=True
+        outputs=[final_output, plot_output]
     )
 
-demo.launch()
+demo.launch(share=True)
