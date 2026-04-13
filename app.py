@@ -1,9 +1,9 @@
 
 import gradio as gr
 
-# -----------------------------
+
 # MERGE SORT WITH VISUAL STEPS
-# -----------------------------
+
 
 def merge(left, right, key, steps):
     # Merge two sorted lists (left and right) based on the chosen key.
@@ -56,9 +56,9 @@ def merge_sort(arr, key, steps):
     return merge(left, right, key, steps)
 
 
-# -----------------------------
+
 # PLAYLIST SORTING LOGIC
-# -----------------------------
+
 
 def sort_playlist(titles, artists, energies, durations, sort_key):
     # Convert raw text inputs into a structured list of song dictionaries.
@@ -102,9 +102,9 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     return final_display, step_text
 
 
-# -----------------------------
+
 # GRADIO UI
-# -----------------------------
+
 
 with gr.Blocks() as demo:
     # Title + description for the app interface.
