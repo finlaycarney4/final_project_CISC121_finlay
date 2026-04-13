@@ -2,12 +2,9 @@ import gradio as gr
 import matplotlib.pyplot as plt
 
 
-# ============================================================
+
 # MERGE SORT WITH FRAME CAPTURE
-# ------------------------------------------------------------
-# Each comparison and merge step produces a "frame" so the
-# sorting process can be animated visually.
-# ============================================================
+
 
 def merge(left, right, key, frames):
     merged = []
@@ -60,12 +57,9 @@ def merge_sort(arr, key, frames):
     return merge(left, right, key, frames)
 
 
-# ============================================================
+
 # FRAME VISUALIZATION
-# ------------------------------------------------------------
-# Converts a merge‑sort frame into a bar chart figure.
-# Handles empty data safely.
-# ============================================================
+
 
 def plot_frame(frame, key):
     data = frame["data"]
@@ -91,21 +85,19 @@ def plot_frame(frame, key):
             if item is a or item is b:
                 bar.set_color("red")
 
+    # FIX: Matplotlib requires ticks before setting tick labels
+    ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels, rotation=45, ha="right")
+
     ax.set_title(f"Sorting by {key}")
     plt.tight_layout()
     plt.close(fig)
     return fig
 
 
-# ============================================================
+
 # SORT PIPELINE (STREAMING GENERATOR)
-# ------------------------------------------------------------
-# IMPORTANT:
-#   • This function ALWAYS yields (text, plot) pairs.
-#   • This is required for Gradio streaming to work.
-#   • All error messages must be yielded, not returned.
-# ============================================================
+
 
 def safe_int(x):
     try:
@@ -154,12 +146,9 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     yield final_text, final_plot
 
 
-# ============================================================
+
 # GRADIO UI
-# ------------------------------------------------------------
-# run_sort MUST return the generator directly.
-# It must NEVER return anything else.
-# ============================================================
+
 
 def parse_csv(text):
     return [x.strip() for x in text.split(",") if x.strip()]
@@ -197,6 +186,7 @@ with gr.Blocks() as demo:
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
         outputs=[final_output, plot_output],
+        stream=True,   # Required for generator to function
     )
 
 demo.launch()
