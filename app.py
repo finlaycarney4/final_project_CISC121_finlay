@@ -167,4 +167,4 @@ with gr.Blocks() as demo:
         outputs=[final_output, plot_output]
     )
 
-demo.launch(share=True)
+demo.launch()
