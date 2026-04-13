@@ -2,16 +2,19 @@ import gradio as gr
 import matplotlib.pyplot as plt
 
 
-# =========================
-# MERGE SORT (ANIMATED)
-# =========================
+# ============================================================
+# MERGE SORT WITH FRAME CAPTURE
+# ------------------------------------------------------------
+# Each comparison and merge step produces a "frame" so the
+# sorting process can be animated visually.
+# ============================================================
 
 def merge(left, right, key, frames):
     merged = []
     i = j = 0
 
+    # Compare elements from both halves
     while i < len(left) and j < len(right):
-
         frames.append({
             "data": merged + left[i:] + right[j:],
             "highlight": (left[i], right[j]),
@@ -31,6 +34,7 @@ def merge(left, right, key, frames):
             "message": "Moved item into merged list"
         })
 
+    # Append remaining items (no comparisons needed)
     merged.extend(left[i:])
     merged.extend(right[j:])
 
@@ -44,25 +48,27 @@ def merge(left, right, key, frames):
 
 
 def merge_sort(arr, key, frames):
+    # Base case: size 0 or 1 is already sorted
     if len(arr) <= 1:
         return arr
 
     mid = len(arr) // 2
     left = merge_sort(arr[:mid], key, frames)
     right = merge_sort(arr[mid:], key, frames)
-
     return merge(left, right, key, frames)
 
 
-# =========================
+# ============================================================
 # FRAME VISUALIZATION
-# =========================
+# ------------------------------------------------------------
+# Converts a single merge-sort frame into a bar chart figure.
+# Handles empty data safely.
+# ============================================================
 
 def plot_frame(frame, key):
     data = frame["data"]
-    highlight = frame["highlight"]
 
-    # Handle empty data safely
+    # Empty playlist → show placeholder figure
     if not data:
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No data to display", ha="center", va="center", fontsize=14)
@@ -76,22 +82,26 @@ def plot_frame(frame, key):
     fig, ax = plt.subplots(figsize=(8, 4))
     bars = ax.bar(labels, values)
 
-    if highlight:
+    # Highlight compared items
+    if frame["highlight"]:
+        a, b = frame["highlight"]
         for bar, item in zip(bars, data):
-            if item is highlight[0] or item is highlight[1]:
+            if item is a or item is b:
                 bar.set_color("red")
 
     ax.set_xticklabels(labels, rotation=45, ha="right")
     ax.set_title(f"Sorting by {key}")
     plt.tight_layout()
-
     plt.close(fig)
     return fig
 
 
-# =========================
-# SORT + ANIMATION
-# =========================
+# ============================================================
+# SORT PIPELINE (STREAMING GENERATOR)
+# ------------------------------------------------------------
+# This function ALWAYS yields (text, plot) pairs.
+# This is critical for Gradio streaming to work correctly.
+# ============================================================
 
 def safe_int(x):
     try:
@@ -102,17 +112,13 @@ def safe_int(x):
 
 def sort_playlist(titles, artists, energies, durations, sort_key):
 
-    # If ALL lists are empty → valid empty playlist
+    # Case 1: All lists empty → valid empty playlist
     if len(titles) == len(artists) == len(energies) == len(durations) == 0:
-        empty_frame = {
-            "data": [],
-            "highlight": None,
-            "message": "Playlist is empty — nothing to sort."
-        }
-        yield empty_frame["message"], plot_frame(empty_frame, sort_key)
+        frame = {"data": [], "highlight": None, "message": "Playlist is empty — nothing to sort."}
+        yield frame["message"], plot_frame(frame, sort_key)
         return
 
-    # If SOME lists are empty → mismatch error
+    # Case 2: Some lists empty → invalid input
     if not (len(titles) == len(artists) == len(energies) == len(durations)):
         yield "Error: All lists must have the same number of items.", None
         return
@@ -130,10 +136,9 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
 
-    # Stream animation frames
+    # Stream each animation frame
     for frame in frames:
-        fig = plot_frame(frame, sort_key)
-        yield frame["message"], fig
+        yield frame["message"], plot_frame(frame, sort_key)
 
     # Final sorted output
     final_text = "\n".join(
@@ -142,19 +147,22 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     )
 
     final_plot = plot_frame({"data": sorted_list, "highlight": None}, sort_key)
-
     yield final_text, final_plot
 
 
-# =========================
+# ============================================================
 # GRADIO UI
-# =========================
+# ------------------------------------------------------------
+# run_sort MUST return the generator directly.
+# It must NEVER return anything else.
+# ============================================================
 
 def parse_csv(text):
     return [x.strip() for x in text.split(",") if x.strip()]
 
 
 def run_sort(t, a, e, d, key):
+    # IMPORTANT: Always return the generator itself.
     return sort_playlist(
         parse_csv(t),
         parse_csv(a),
