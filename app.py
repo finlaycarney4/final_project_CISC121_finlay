@@ -92,10 +92,10 @@ def plot_frame(frame, key):
 # SORT + ANIMATION
 
 
-def sort_playlist(titles, artists, energies, durations, sort_key, textbox, plotbox):
+def sort_playlist(titles, artists, energies, durations, sort_key):
     # Hugging Face crashes if lists are mismatched — check early
     if not (len(titles) == len(artists) == len(energies) == len(durations)):
-        textbox.update("Error: All lists must have the same number of items.")
+        yield "Error: All lists must have the same number of items.", None
         return
 
     # Build structured playlist objects
@@ -111,12 +111,11 @@ def sort_playlist(titles, artists, energies, durations, sort_key, textbox, plotb
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
 
-    # Manually update components inside a loop.
+    # Yield each animation frame
     for frame in frames:
         plt_frame = plot_frame(frame, sort_key)
-        textbox.update(frame["message"])   # live text update
-        plotbox.update(plt_frame)          # live plot update
-        time.sleep(0.6)                    # controls animation speed
+        yield frame["message"], plt_frame
+        time.sleep(0.6)
 
     # Build final sorted playlist text
     final_text = "\n".join(
@@ -127,8 +126,7 @@ def sort_playlist(titles, artists, energies, durations, sort_key, textbox, plotb
     final_plot = plot_frame({"data": sorted_list, "highlight": None}, sort_key)
 
     # Final UI update
-    textbox.update(final_text)
-    plotbox.update(final_plot)
+    yield final_text, final_plot
 
 
 
@@ -156,25 +154,20 @@ with gr.Blocks() as demo:
         return [x.strip() for x in text.split(",")]
 
     def run_sort(t, a, e, d, key):
-        # Pass UI components so they can be updated live
-        sort_playlist(
+        # Generator returned directly to Gradio for streaming
+        return sort_playlist(
             parse_csv(t),
             parse_csv(a),
             parse_csv(e),
             parse_csv(d),
-            key,
-            final_output,
-            plot_output
+            key
         )
-        # Must return something or Gradio ignores the event
-        return gr.update(), gr.update()
 
-    # No outputs here because updates happen inside the function
     sort_button.click(
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
-        outputs=[final_output, plot_output]
+        outputs=[final_output, plot_output],
+        stream=True   # REQUIRED for animation
     )
 
-demo.queue()  
 demo.launch()
