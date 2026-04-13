@@ -166,12 +166,15 @@ with gr.Blocks() as demo:
             final_output,
             plot_output
         )
+        # Must return something or Gradio ignores the event
+        return gr.update(), gr.update()
 
     # No outputs here because updates happen inside the function
     sort_button.click(
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
-        outputs=[]
+        outputs=[final_output, plot_output]
     )
 
+demo.queue()  
 demo.launch()
