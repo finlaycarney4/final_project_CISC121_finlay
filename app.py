@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import time
 
 
-# MERGE SORT — records frames for animation
+# MERGE SORT
 
 
 def merge(left, right, key, frames):
@@ -12,14 +12,13 @@ def merge(left, right, key, frames):
 
     while i < len(left) and j < len(right):
 
-        # Save comparison frame (used for animation)
+        # Capture comparison state for animation
         frames.append({
             "data": merged + left[i:] + right[j:],
             "highlight": (left[i], right[j]),
             "message": f"Comparing {left[i]['title']} and {right[j]['title']}"
         })
 
-        # Standard merge logic
         if left[i][key] <= right[j][key]:
             merged.append(left[i])
             i += 1
@@ -27,18 +26,18 @@ def merge(left, right, key, frames):
             merged.append(right[j])
             j += 1
 
-        # Save frame after moving an item
+        # Capture state after moving an item
         frames.append({
             "data": merged + left[i:] + right[j:],
             "highlight": None,
             "message": "Moved item into merged list"
         })
 
-    # Add remaining items
+    # Add leftovers (no comparisons)
     merged.extend(left[i:])
     merged.extend(right[j:])
 
-    # Final frame for this merge step
+    # Final snapshot of this merge step
     frames.append({
         "data": merged.copy(),
         "highlight": None,
@@ -49,23 +48,25 @@ def merge(left, right, key, frames):
 
 
 def merge_sort(arr, key, frames):
-    # Recursive split + merge
+    # Base case for recursion
     if len(arr) <= 1:
         return arr
 
     mid = len(arr) // 2
+
+    # Recursively collect frames from both halves
     left = merge_sort(arr[:mid], key, frames)
     right = merge_sort(arr[mid:], key, frames)
 
     return merge(left, right, key, frames)
 
 
-# -----------------------------
+
 # FRAME VISUALIZATION
-# -----------------------------
+
 
 def plot_frame(frame, key):
-    # Draws a bar chart for the current frame
+    # Convert frame data into bar chart
     data = frame["data"]
     highlight = frame["highlight"]
 
@@ -75,7 +76,7 @@ def plot_frame(frame, key):
     plt.figure(figsize=(8, 4))
     bars = plt.bar(labels, values)
 
-    # Highlight compared items
+    # Highlight only the items being compared
     if highlight:
         for bar, item in zip(bars, data):
             if item in highlight:
@@ -88,15 +89,16 @@ def plot_frame(frame, key):
 
 
 
-# SORT + ANIMATION LOOP
+# SORT + ANIMATION
 
 
-def sort_playlist(titles, artists, energies, durations, sort_key):
-    # Prevents crashes from mismatched list lengths
+def sort_playlist(titles, artists, energies, durations, sort_key, textbox, plotbox):
+    # Hugging Face crashes if lists are mismatched — check early
     if not (len(titles) == len(artists) == len(energies) == len(durations)):
-        return "Error: All lists must have the same number of items.", None
+        textbox.update("Error: All lists must have the same number of items.")
+        return
 
-    # Build playlist objects
+    # Build structured playlist objects
     playlist = []
     for t, a, e, d in zip(titles, artists, energies, durations):
         playlist.append({
@@ -109,11 +111,12 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
 
-    # Send each animation frame to Gradio
+    # Manually update components inside a loop.
     for frame in frames:
         plt_frame = plot_frame(frame, sort_key)
-        yield frame["message"], plt_frame
-        time.sleep(0.6)
+        textbox.update(frame["message"])   # live text update
+        plotbox.update(plt_frame)          # live plot update
+        time.sleep(0.6)                    # controls animation speed
 
     # Build final sorted playlist text
     final_text = "\n".join(
@@ -122,12 +125,14 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     )
 
     final_plot = plot_frame({"data": sorted_list, "highlight": None}, sort_key)
-    yield final_text, final_plot
+
+    # Final UI update
+    textbox.update(final_text)
+    plotbox.update(final_plot)
 
 
 
 # GRADIO UI
-
 
 with gr.Blocks() as demo:
     gr.Markdown("# 🎵 Playlist Vibe Builder\n### Watch Merge Sort Animate Your Playlist!")
@@ -147,24 +152,26 @@ with gr.Blocks() as demo:
     plot_output = gr.Plot(label="Sorting Visualization")
 
     def parse_csv(text):
-        # Converts comma-separated text into a list
+        # Ensures clean list even with extra spaces
         return [x.strip() for x in text.split(",")]
 
     def run_sort(t, a, e, d, key):
-        # Wrapper to feed parsed lists into the sorter
-        return sort_playlist(
+        # Pass UI components so they can be updated live
+        sort_playlist(
             parse_csv(t),
             parse_csv(a),
             parse_csv(e),
             parse_csv(d),
-            key
+            key,
+            final_output,
+            plot_output
         )
 
-    # No stream=True — compatible with Gradio 3.x
+    # No outputs here because updates happen inside the function
     sort_button.click(
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
-        outputs=[final_output, plot_output]
+        outputs=[]
     )
 
 demo.launch()
