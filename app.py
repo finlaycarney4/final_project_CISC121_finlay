@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import time
 
 
-# MERGE SORT WITH FRAME CAPTURE
+# MERGE SORT — records frames for animation
 
 
 def merge(left, right, key, frames):
@@ -11,13 +11,15 @@ def merge(left, right, key, frames):
     i = j = 0
 
     while i < len(left) and j < len(right):
-        # Record comparison frame
+
+        # Save comparison frame (used for animation)
         frames.append({
             "data": merged + left[i:] + right[j:],
             "highlight": (left[i], right[j]),
             "message": f"Comparing {left[i]['title']} and {right[j]['title']}"
         })
 
+        # Standard merge logic
         if left[i][key] <= right[j][key]:
             merged.append(left[i])
             i += 1
@@ -25,16 +27,18 @@ def merge(left, right, key, frames):
             merged.append(right[j])
             j += 1
 
-        # Record after-move frame
+        # Save frame after moving an item
         frames.append({
             "data": merged + left[i:] + right[j:],
             "highlight": None,
             "message": "Moved item into merged list"
         })
 
+    # Add remaining items
     merged.extend(left[i:])
     merged.extend(right[j:])
 
+    # Final frame for this merge step
     frames.append({
         "data": merged.copy(),
         "highlight": None,
@@ -45,6 +49,7 @@ def merge(left, right, key, frames):
 
 
 def merge_sort(arr, key, frames):
+    # Recursive split + merge
     if len(arr) <= 1:
         return arr
 
@@ -55,11 +60,12 @@ def merge_sort(arr, key, frames):
     return merge(left, right, key, frames)
 
 
-
-# VISUALIZATION FUNCTION
-
+# -----------------------------
+# FRAME VISUALIZATION
+# -----------------------------
 
 def plot_frame(frame, key):
+    # Draws a bar chart for the current frame
     data = frame["data"]
     highlight = frame["highlight"]
 
@@ -69,7 +75,7 @@ def plot_frame(frame, key):
     plt.figure(figsize=(8, 4))
     bars = plt.bar(labels, values)
 
-    # Highlight compared bars
+    # Highlight compared items
     if highlight:
         for bar, item in zip(bars, data):
             if item in highlight:
@@ -81,17 +87,17 @@ def plot_frame(frame, key):
     return plt
 
 
-# -----------------------------
-# SORT + ANIMATION LOGIC
-# -----------------------------
+
+# SORT + ANIMATION LOOP
+
 
 def sort_playlist(titles, artists, energies, durations, sort_key):
-    # Validate equal lengths
+    # Prevents crashes from mismatched list lengths
     if not (len(titles) == len(artists) == len(energies) == len(durations)):
         return "Error: All lists must have the same number of items.", None
 
+    # Build playlist objects
     playlist = []
-
     for t, a, e, d in zip(titles, artists, energies, durations):
         playlist.append({
             "title": t,
@@ -103,23 +109,19 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
 
-    # Animation loop
+    # Send each animation frame to Gradio
     for frame in frames:
         plt_frame = plot_frame(frame, sort_key)
-        yield (
-            frame["message"],
-            plt_frame
-        )
+        yield frame["message"], plt_frame
         time.sleep(0.6)
 
-    # Final sorted playlist text
+    # Build final sorted playlist text
     final_text = "\n".join(
         [f"{s['title']} — {s['artist']} | Energy: {s['energy']} | Duration: {s['duration']}s"
          for s in sorted_list]
     )
 
     final_plot = plot_frame({"data": sorted_list, "highlight": None}, sort_key)
-
     yield final_text, final_plot
 
 
@@ -145,9 +147,11 @@ with gr.Blocks() as demo:
     plot_output = gr.Plot(label="Sorting Visualization")
 
     def parse_csv(text):
+        # Converts comma-separated text into a list
         return [x.strip() for x in text.split(",")]
 
     def run_sort(t, a, e, d, key):
+        # Wrapper to feed parsed lists into the sorter
         return sort_playlist(
             parse_csv(t),
             parse_csv(a),
@@ -156,10 +160,11 @@ with gr.Blocks() as demo:
             key
         )
 
+    # No stream=True — compatible with Gradio 3.x
     sort_button.click(
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
         outputs=[final_output, plot_output]
     )
 
-demo.launch(share=True)
+demo.launch()
