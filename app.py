@@ -91,7 +91,7 @@ def plot_frame(frame, key):
             if item is a or item is b:
                 bar.set_color("red")
 
-    # FIX: Matplotlib requires ticks before setting tick labels
+    # Matplotlib requires ticks before setting tick labels
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels, rotation=45, ha="right")
 
@@ -105,9 +105,9 @@ def plot_frame(frame, key):
 # SORT PIPELINE (STREAMING GENERATOR)
 # ------------------------------------------------------------
 # IMPORTANT:
-#   • This function ALWAYS yields (text, plot) pairs.
-#   • This is required for Gradio streaming to work.
-#   • All error messages must be yielded, not returned.
+#   • This generator now yields ONLY PLOTS.
+#   • The final sorted playlist text is returned at the end.
+#   • This is the only pattern that works on older Gradio.
 # ============================================================
 
 def safe_int(x):
@@ -122,13 +122,13 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     # Case 1: All lists empty → valid empty playlist
     if len(titles) == len(artists) == len(energies) == len(durations) == 0:
         frame = {"data": [], "highlight": None, "message": "Playlist is empty — nothing to sort."}
-        yield frame["message"], plot_frame(frame, sort_key)
-        return
+        yield plot_frame(frame, sort_key)
+        return "Playlist is empty — nothing to sort."
 
     # Case 2: Some lists empty → invalid input
     if not (len(titles) == len(artists) == len(energies) == len(durations)):
-        yield "Error: All lists must have the same number of items.", None
-        return
+        yield None
+        return "Error: All lists must have the same number of items."
 
     # Build playlist objects
     playlist = []
@@ -143,25 +143,30 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
 
-    # Stream animation frames
+    # Stream animation frames (plots only)
     for frame in frames:
-        yield frame["message"], plot_frame(frame, sort_key)
+        yield plot_frame(frame, sort_key)
 
-    # Final sorted output
+    # Final sorted output text
     final_text = "\n".join(
         [f"{s['title']} — {s['artist']} | Energy: {s['energy']} | Duration: {s['duration']}s"
          for s in sorted_list]
     )
 
+    # Final plot
     final_plot = plot_frame({"data": sorted_list, "highlight": None}, sort_key)
-    yield final_text, final_plot
+    yield final_plot
+
+    return final_text
 
 
 # ============================================================
 # GRADIO UI
 # ------------------------------------------------------------
-# run_sort MUST return TWO outputs, even before streaming begins.
-# Older Gradio versions REQUIRE this.
+# run_sort MUST return:
+#   • ONE streaming output (plot)
+#   • ONE static output (final text)
+# This ALWAYS works on older Gradio.
 # ============================================================
 
 def parse_csv(text):
@@ -169,29 +174,24 @@ def parse_csv(text):
 
 
 def run_sort(t, a, e, d, key):
-    # Parse inputs (may be empty)
     titles = parse_csv(t)
     artists = parse_csv(a)
     energies = parse_csv(e)
     durations = parse_csv(d)
 
-    # Create the main generator
     gen = sort_playlist(titles, artists, energies, durations, key)
 
-    # Generator for text output
-    def text_gen():
-        for text, _plot in gen:
-            yield text
+    final_text_holder = {"value": ""}
 
-    # Generator for plot output (must recreate generator)
-    def plot_gen():
-        gen2 = sort_playlist(titles, artists, energies, durations, key)
-        for _text, plot in gen2:
-            yield plot
+    # Wrapper generator that streams plots and captures final text
+    def plot_stream():
+        for result in gen:
+            if isinstance(result, str):
+                final_text_holder["value"] = result
+            else:
+                yield result
 
-    # IMPORTANT:
-    # Gradio requires TWO outputs ALWAYS, even before streaming starts.
-    return text_gen(), plot_gen()
+    return plot_stream(), final_text_holder["value"]
 
 
 with gr.Blocks() as demo:
@@ -208,14 +208,14 @@ with gr.Blocks() as demo:
     sort_key = gr.Radio(["energy", "duration"], label="Sort By", value="energy")
     sort_button = gr.Button("Sort Playlist")
 
-    final_output = gr.Textbox(label="Sorted Playlist", lines=10)
+    # IMPORTANT: plot first (streamed), text second (static)
     plot_output = gr.Plot(label="Sorting Visualization")
+    final_output = gr.Textbox(label="Sorted Playlist", lines=10)
 
-    # No stream=True — older Gradio handles generator streaming automatically
     sort_button.click(
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
-        outputs=[final_output, plot_output]
+        outputs=[plot_output, final_output]
     )
 
 demo.launch()
