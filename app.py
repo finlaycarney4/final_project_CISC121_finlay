@@ -73,7 +73,7 @@ def plot_frame(frame, key):
     # Empty playlist → placeholder figure
     if not data:
         fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No data to display", ha="center", va="center", fontsize=14)
+        ax.text(0.5, 0.5, "No songs to sort!", ha="center", va="center", fontsize=14)
         ax.set_axis_off()
         plt.close(fig)
         return fig
@@ -91,7 +91,6 @@ def plot_frame(frame, key):
             if item is a or item is b:
                 bar.set_color("red")
 
-    # Matplotlib requires ticks before setting tick labels
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels, rotation=45, ha="right")
 
@@ -105,9 +104,8 @@ def plot_frame(frame, key):
 # SORT PIPELINE (STREAMING GENERATOR)
 # ------------------------------------------------------------
 # IMPORTANT:
-#   • This generator now yields ONLY PLOTS.
+#   • This generator yields ONLY PLOTS.
 #   • The final sorted playlist text is returned at the end.
-#   • This is the only pattern that works on older Gradio.
 # ============================================================
 
 def safe_int(x):
@@ -119,15 +117,20 @@ def safe_int(x):
 
 def sort_playlist(titles, artists, energies, durations, sort_key):
 
-    # Case 1: All lists empty → valid empty playlist
+    # Case 1: All lists empty → show "No songs to sort!"
     if len(titles) == len(artists) == len(energies) == len(durations) == 0:
-        frame = {"data": [], "highlight": None, "message": "Playlist is empty — nothing to sort."}
-        yield plot_frame(frame, sort_key)
-        return "Playlist is empty — nothing to sort."
+        frame = {"data": [], "highlight": None}
+        fig = plot_frame(frame, sort_key)
+        yield fig
+        return "No songs to sort!"
 
     # Case 2: Some lists empty → invalid input
     if not (len(titles) == len(artists) == len(energies) == len(durations)):
-        yield None
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "Input error", ha="center", va="center", fontsize=14)
+        ax.set_axis_off()
+        plt.close(fig)
+        yield fig
         return "Error: All lists must have the same number of items."
 
     # Build playlist objects
@@ -163,10 +166,8 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
 # ============================================================
 # GRADIO UI
 # ------------------------------------------------------------
-# run_sort MUST return:
-#   • ONE streaming output (plot)
-#   • ONE static output (final text)
-# This ALWAYS works on older Gradio.
+# Streaming output = plot
+# Final output = text
 # ============================================================
 
 def parse_csv(text):
@@ -208,7 +209,6 @@ with gr.Blocks() as demo:
     sort_key = gr.Radio(["energy", "duration"], label="Sort By", value="energy")
     sort_button = gr.Button("Sort Playlist")
 
-    # IMPORTANT: plot first (streamed), text second (static)
     plot_output = gr.Plot(label="Sorting Visualization")
     final_output = gr.Textbox(label="Sorted Playlist", lines=10)
 
