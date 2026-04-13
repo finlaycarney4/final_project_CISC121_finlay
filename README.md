@@ -4,8 +4,8 @@ emoji: 🎵
 colorFrom: blue
 colorTo: green
 sdk: gradio
-sdk_version: "4.0.0"
-python_version: "3.10"
+sdk_version: 6.12.0
+python_version: '3.10'
 app_file: app.py
 pinned: false
 ---
@@ -52,25 +52,3 @@ I tested each sorting type with the same five songs to make sure that the code c
 
 Acknowledgement
 The only non-AI source I used was the provided examples of apps (https://huggingface.co/spaces/RuslanKain/sorting-searching-recognized-gestures) and the Gradio beginner video (https://www.youtube.com/watch?v=xqdTFyRdtjQ). Other than that, I used Copilot (Microsoft Copilot: Your AI companion) to help me develop and structure the code and give me ideas as to how to program it. I used Claude.AI (Claude) when I needed help with the actual implementation of the code.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
