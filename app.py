@@ -160,8 +160,8 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
 # ============================================================
 # GRADIO UI
 # ------------------------------------------------------------
-# run_sort MUST return the generator directly.
-# It must NEVER return anything else.
+# run_sort MUST return TWO outputs, even before streaming begins.
+# Older Gradio versions REQUIRE this.
 # ============================================================
 
 def parse_csv(text):
@@ -169,14 +169,29 @@ def parse_csv(text):
 
 
 def run_sort(t, a, e, d, key):
-    # Always return the generator itself
-    return sort_playlist(
-        parse_csv(t),
-        parse_csv(a),
-        parse_csv(e),
-        parse_csv(d),
-        key
-    )
+    # Parse inputs (may be empty)
+    titles = parse_csv(t)
+    artists = parse_csv(a)
+    energies = parse_csv(e)
+    durations = parse_csv(d)
+
+    # Create the main generator
+    gen = sort_playlist(titles, artists, energies, durations, key)
+
+    # Generator for text output
+    def text_gen():
+        for text, _plot in gen:
+            yield text
+
+    # Generator for plot output (must recreate generator)
+    def plot_gen():
+        gen2 = sort_playlist(titles, artists, energies, durations, key)
+        for _text, plot in gen2:
+            yield plot
+
+    # IMPORTANT:
+    # Gradio requires TWO outputs ALWAYS, even before streaming starts.
+    return text_gen(), plot_gen()
 
 
 with gr.Blocks() as demo:
@@ -196,7 +211,7 @@ with gr.Blocks() as demo:
     final_output = gr.Textbox(label="Sorted Playlist", lines=10)
     plot_output = gr.Plot(label="Sorting Visualization")
 
-    # IMPORTANT: No stream=True for older Gradio
+    # No stream=True — older Gradio handles generator streaming automatically
     sort_button.click(
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
