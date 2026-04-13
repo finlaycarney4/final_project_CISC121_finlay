@@ -2,9 +2,12 @@ import gradio as gr
 import matplotlib.pyplot as plt
 
 
-
+# ============================================================
 # MERGE SORT WITH FRAME CAPTURE
-
+# ------------------------------------------------------------
+# Each comparison and merge step produces a "frame" so the
+# sorting process can be animated visually.
+# ============================================================
 
 def merge(left, right, key, frames):
     merged = []
@@ -57,9 +60,12 @@ def merge_sort(arr, key, frames):
     return merge(left, right, key, frames)
 
 
-
+# ============================================================
 # FRAME VISUALIZATION
-
+# ------------------------------------------------------------
+# Converts a merge‑sort frame into a bar chart figure.
+# Handles empty data safely.
+# ============================================================
 
 def plot_frame(frame, key):
     data = frame["data"]
@@ -95,9 +101,14 @@ def plot_frame(frame, key):
     return fig
 
 
-
+# ============================================================
 # SORT PIPELINE (STREAMING GENERATOR)
-
+# ------------------------------------------------------------
+# IMPORTANT:
+#   • This function ALWAYS yields (text, plot) pairs.
+#   • This is required for Gradio streaming to work.
+#   • All error messages must be yielded, not returned.
+# ============================================================
 
 def safe_int(x):
     try:
@@ -146,9 +157,12 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     yield final_text, final_plot
 
 
-
+# ============================================================
 # GRADIO UI
-
+# ------------------------------------------------------------
+# run_sort MUST return the generator directly.
+# It must NEVER return anything else.
+# ============================================================
 
 def parse_csv(text):
     return [x.strip() for x in text.split(",") if x.strip()]
@@ -182,11 +196,11 @@ with gr.Blocks() as demo:
     final_output = gr.Textbox(label="Sorted Playlist", lines=10)
     plot_output = gr.Plot(label="Sorting Visualization")
 
+    # IMPORTANT: No stream=True for older Gradio
     sort_button.click(
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
-        outputs=[final_output, plot_output],
-        stream=True,   # Required for generator to function
+        outputs=[final_output, plot_output]
     )
 
 demo.launch()
