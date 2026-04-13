@@ -2,16 +2,21 @@ import gradio as gr
 import matplotlib.pyplot as plt
 import time
 
-# -----------------------------
-# MERGE SORT WITH VISUAL OUTPUT
-# -----------------------------
+
+# MERGE SORT WITH FRAME CAPTURE
+
 
 def merge(left, right, key, frames):
     merged = []
     i = j = 0
 
-    # Merge while recording frames for visualization
     while i < len(left) and j < len(right):
+        # Record comparison frame
+        frames.append({
+            "data": merged + left[i:] + right[j:],
+            "highlight": (left[i], right[j])
+        })
+
         if left[i][key] <= right[j][key]:
             merged.append(left[i])
             i += 1
@@ -19,16 +24,16 @@ def merge(left, right, key, frames):
             merged.append(right[j])
             j += 1
 
-        # Save current state for visualization
-        frames.append(merged + left[i:] + right[j:])
+        # Record after-move frame
+        frames.append({
+            "data": merged + left[i:] + right[j:],
+            "highlight": None
+        })
 
-    # Add remaining elements
     merged.extend(left[i:])
     merged.extend(right[j:])
 
-    # Save final merged state
-    frames.append(merged.copy())
-
+    frames.append({"data": merged.copy(), "highlight": None})
     return merged
 
 
@@ -43,32 +48,39 @@ def merge_sort(arr, key, frames):
     return merge(left, right, key, frames)
 
 
-# -----------------------------
-# VISUALIZATION FUNCTION
-# -----------------------------
 
-def create_plot(data, key):
-    # Create a bar chart showing current state of sorting
+# VISUALIZATION FUNCTION
+
+
+def plot_frame(frame, key):
+    data = frame["data"]
+    highlight = frame["highlight"]
+
     values = [item[key] for item in data]
     labels = [item["title"] for item in data]
 
-    plt.figure()
-    plt.bar(labels, values)
+    plt.figure(figsize=(8, 4))
+    bars = plt.bar(labels, values)
+
+    # Highlight compared bars
+    if highlight:
+        for bar, item in zip(bars, data):
+            if item in highlight:
+                bar.set_color("red")
+
     plt.xticks(rotation=45, ha="right")
     plt.title(f"Sorting by {key}")
     plt.tight_layout()
-
     return plt
 
 
-# -----------------------------
-# PLAYLIST SORTING LOGIC
-# -----------------------------
+
+# SORT + ANIMATION LOGIC
+
 
 def sort_playlist(titles, artists, energies, durations, sort_key):
     playlist = []
 
-    # Build playlist dictionary
     for t, a, e, d in zip(titles, artists, energies, durations):
         if t.strip() == "":
             continue
@@ -80,32 +92,32 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
         })
 
     if len(playlist) == 0:
-        return "No songs entered!", None
+        yield "No songs entered!", None
 
-    # Store frames for animation
     frames = []
-
-    # Perform merge sort
     sorted_list = merge_sort(playlist, sort_key, frames)
 
-    # Final text output
-    final_display = "\n".join(
+    # Animate frames
+    for frame in frames:
+        plt_frame = plot_frame(frame, sort_key)
+        yield "Sorting...", plt_frame
+
+    # Final sorted playlist text
+    final_text = "\n".join(
         [f"{s['title']} — {s['artist']} | Energy: {s['energy']} | Duration: {s['duration']}s"
          for s in sorted_list]
     )
 
-    # Create final visualization (last frame)
-    plot = create_plot(sorted_list, sort_key)
-
-    return final_display, plot
+    final_plot = plot_frame({"data": sorted_list, "highlight": None}, sort_key)
+    yield final_text, final_plot
 
 
-# -----------------------------
+
 # GRADIO UI
-# -----------------------------
+
 
 with gr.Blocks() as demo:
-    gr.Markdown("# 🎵 Playlist Vibe Builder\nVisualize Merge Sort in action!")
+    gr.Markdown("# 🎵 Playlist Vibe Builder\n### Watch Merge Sort Animate Your Playlist!")
 
     with gr.Row():
         titles = gr.Textbox(label="Song Titles (comma-separated)")
@@ -115,35 +127,19 @@ with gr.Blocks() as demo:
         energies = gr.Textbox(label="Energy Scores 0–100 (comma-separated)")
         durations = gr.Textbox(label="Durations in seconds (comma-separated)")
 
-    sort_key = gr.Radio(
-        ["energy", "duration"],
-        label="Sort By",
-        value="energy"
-    )
-
+    sort_key = gr.Radio(["energy", "duration"], label="Sort By", value="energy")
     sort_button = gr.Button("Sort Playlist")
 
-    # Outputs
     final_output = gr.Textbox(label="Sorted Playlist", lines=10)
     plot_output = gr.Plot(label="Sorting Visualization")
 
     def parse_csv(text):
         return [x.strip() for x in text.split(",")]
 
-    def run_sort(t, a, e, d, key):
-        return sort_playlist(
-            parse_csv(t),
-            parse_csv(a),
-            parse_csv(e),
-            parse_csv(d),
-            key
-        )
-
     sort_button.click(
-        run_sort,
+        sort_playlist,
         inputs=[titles, artists, energies, durations, sort_key],
         outputs=[final_output, plot_output]
     )
 
-# Launch app
-demo.launch(share=True)
+demo.launch()
