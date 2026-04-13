@@ -10,7 +10,6 @@ def merge(left, right, key, frames):
     merged = []
     i = j = 0
 
-    # Merge while comparing
     while i < len(left) and j < len(right):
 
         frames.append({
@@ -32,7 +31,6 @@ def merge(left, right, key, frames):
             "message": "Moved item into merged list"
         })
 
-    # Add leftovers
     merged.extend(left[i:])
     merged.extend(right[j:])
 
@@ -78,7 +76,6 @@ def plot_frame(frame, key):
     fig, ax = plt.subplots(figsize=(8, 4))
     bars = ax.bar(labels, values)
 
-    # Highlight compared items
     if highlight:
         for bar, item in zip(bars, data):
             if item is highlight[0] or item is highlight[1]:
@@ -105,7 +102,17 @@ def safe_int(x):
 
 def sort_playlist(titles, artists, energies, durations, sort_key):
 
-    # Check list lengths
+    # If ALL lists are empty → valid empty playlist
+    if len(titles) == len(artists) == len(energies) == len(durations) == 0:
+        empty_frame = {
+            "data": [],
+            "highlight": None,
+            "message": "Playlist is empty — nothing to sort."
+        }
+        yield empty_frame["message"], plot_frame(empty_frame, sort_key)
+        return
+
+    # If SOME lists are empty → mismatch error
     if not (len(titles) == len(artists) == len(energies) == len(durations)):
         yield "Error: All lists must have the same number of items.", None
         return
@@ -119,11 +126,6 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
             "energy": safe_int(e),
             "duration": safe_int(d)
         })
-
-    # Handle empty playlist
-    if len(playlist) == 0:
-        yield "Playlist is empty — nothing to sort.", None
-        return
 
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
