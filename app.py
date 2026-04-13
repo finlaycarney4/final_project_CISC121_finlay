@@ -2,18 +2,9 @@ import gradio as gr
 import matplotlib.pyplot as plt
 
 
-# ============================================================
+
 # MERGE SORT WITH FRAME CAPTURE
-#
-# Standard merge sort, extended to record a "frame" at each
-# comparison step. These frames are later replayed as bar chart
-# snapshots to animate the sort in the Gradio UI.
-#
-# Each frame is a dict with:
-#   "data"              — the full list in its current partial order
-#   "highlight_indices" — positions of the two items being compared
-#   "message"           — human-readable description of the step
-# ============================================================
+
 
 def merge(left, right, key, frames):
     """
@@ -30,14 +21,10 @@ def merge(left, right, key, frames):
     i = j = 0
 
     while i < len(left) and j < len(right):
-        # Calculate where the two candidates sit in the full reconstructed
-        # list (merged so far + remaining left + remaining right).
-        # We store indices rather than object references so highlight
-        # detection stays reliable even if song dicts are ever copied.
         left_idx  = len(merged)                     # next item from left half
         right_idx = len(merged) + (len(left) - i)   # next item from right half
 
-        # Frame: snapshot the list at the moment of comparison, marking
+        # snapshot the list at the moment of comparison, marking
         # the two candidates so the chart can colour them red.
         frames.append({
             "data": merged + left[i:] + right[j:],
@@ -53,7 +40,7 @@ def merge(left, right, key, frames):
             merged.append(right[j])
             j += 1
 
-        # Frame: snapshot again after the move so the viewer can see
+        # snapshot again after the move so the viewer can see
         # which item was placed and where the list stands now.
         frames.append({
             "data": merged + left[i:] + right[j:],
@@ -61,8 +48,7 @@ def merge(left, right, key, frames):
             "message": "Moved item into merged list"
         })
 
-    # One half is exhausted — append whatever remains from the other.
-    # No comparisons happen here, so we just need a single closing frame.
+    # One half is exhausted, append whatever remains from the other.
     merged.extend(left[i:])
     merged.extend(right[j:])
 
@@ -89,16 +75,11 @@ def merge_sort(arr, key, frames):
     mid   = len(arr) // 2
     left  = merge_sort(arr[:mid], key, frames)   # sort left half
     right = merge_sort(arr[mid:], key, frames)   # sort right half
-    return merge(left, right, key, frames)        # merge the two sorted halves
+    return merge(left, right, key, frames)       # merge the two sorted halves
 
 
-# ============================================================
+
 # FRAME VISUALIZATION
-#
-# Converts a single frame dict into a matplotlib bar chart figure.
-# Bars at highlight_indices are coloured red to show which two
-# songs are currently being compared.
-# ============================================================
 
 def plot_frame(frame, key):
     """
@@ -130,7 +111,7 @@ def plot_frame(frame, key):
     bars = ax.bar(labels, values)
 
     # Colour the two bars currently being compared in red.
-    # Uses stored integer indices rather than object identity (is)
+    # Uses stored integer indices rather than object identity
     # so this works correctly even if song dicts were copied.
     highlight_indices = frame.get("highlight_indices", [])
     for i, bar in enumerate(bars):
@@ -141,19 +122,12 @@ def plot_frame(frame, key):
     ax.set_xticklabels(labels, rotation=45, ha="right")
     ax.set_title(f"Sorting by {key}")
     plt.tight_layout()
-    plt.close(fig)  # close the figure to free memory — Gradio reads it before GC
-    return fig
+    plt.close(fig)  # close the figure to free memory
 
 
-# ============================================================
-# SORT PIPELINE (STREAMING GENERATOR)
-#
-# sort_playlist() is a generator that yields values of two types:
-#   - matplotlib Figure  → an animation frame to display in gr.Plot
-#   - str                → the final sorted playlist text (or an error)
-#
-# Callers must check isinstance(result, str) to tell them apart.
-# ============================================================
+
+# SORT PIPELINE
+
 
 def safe_int(x):
     """
@@ -180,15 +154,15 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
         sort_key: "energy" or "duration"
     """
 
-    # Guard: all four fields came in empty — nothing to sort.
+    # all four fields came in empty — nothing to sort.
     if len(titles) == len(artists) == len(energies) == len(durations) == 0:
         frame = {"data": [], "highlight_indices": []}
         yield plot_frame(frame, sort_key)   # yield an empty chart
         yield "No songs to sort!"           # yield the message string, then stop
         return
 
-    # Guard: the four lists have different lengths — user input is inconsistent.
-    # Show an error chart and message rather than silently producing wrong output.
+    # the four lists have different lengths — user input is inconsistent.
+    # Show an error chart and message
     if not (len(titles) == len(artists) == len(energies) == len(durations)):
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "Input error", ha="center", va="center", fontsize=14)
@@ -198,8 +172,8 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
         yield "Error: All lists must have the same number of items."
         return
 
-    # Build a list of song dicts from the parallel input lists.
-    # safe_int handles non-numeric energy/duration values gracefully.
+    # Build a list of song dictionaries from the parallel input lists.
+    # safe_int handles non-numeric energy/duration values.
     playlist = []
     for t, a, e, d in zip(titles, artists, energies, durations):
         playlist.append({
@@ -209,8 +183,8 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
             "duration": safe_int(d)
         })
 
-    # Run merge sort. All animation frames are collected into `frames`
-    # during the sort — sorting finishes first, then we stream the frames.
+    # All animation frames are collected into `frames`
+    # Sorting happens first, then the frames are streamed
     frames = []
     sorted_list = merge_sort(playlist, sort_key, frames)
 
@@ -219,26 +193,21 @@ def sort_playlist(titles, artists, energies, durations, sort_key):
     for frame in frames:
         yield plot_frame(frame, sort_key)
 
-    # Build the final human-readable summary of the sorted playlist.
+    # Build the final readable summary of the sorted playlist.
     final_text = "\n".join(
         [f"{s['title']} — {s['artist']} | Energy: {s['energy']} | Duration: {s['duration']}s"
          for s in sorted_list]
     )
 
     # Yield the final sorted-state chart, then the summary string.
-    # The string signals to run_sort that sorting is complete.
+    # The string signals that sorting is complete.
     final_plot = plot_frame({"data": sorted_list, "highlight_indices": []}, sort_key)
     yield final_plot
     yield final_text
 
 
-# ============================================================
 # GRADIO INTERFACE
-#
-# run_sort is itself a generator so Gradio can stream updates.
-# Each yield is a (Figure, str) tuple mapping directly to
-# (plot_output, final_output) in the UI.
-# ============================================================
+
 
 def parse_csv(text):
     """Split a comma-separated string into a stripped list, ignoring blanks."""
@@ -263,20 +232,17 @@ def run_sort(t, a, e, d, key):
     gen = sort_playlist(titles, artists, energies, durations, key)
 
     final_text   = ""     # accumulates the summary string when it arrives
-    current_plot = None   # tracks the most recent Figure for the final flush
+    current_plot = None   # tracks the most recent figure for the final flush
 
     for result in gen:
         if isinstance(result, str):
-            # Received the final summary text — hold it; don't yield yet.
-            # It will be paired with the last plot on the flush below.
             final_text = result
         else:
-            # Received an animation frame — stream it to the UI immediately.
-            # final_text is empty string during the animation, which is intentional.
+            # Received an animation frame — streams to the UI.
             current_plot = result
             yield current_plot, final_text
 
-    # Final yield: pair the last plot with the now-complete summary text
+    # pair the last plot with the now-complete summary text
     # so both outputs update together when the animation finishes.
     if current_plot is not None:
         yield current_plot, final_text
@@ -299,8 +265,7 @@ with gr.Blocks() as demo:
     plot_output  = gr.Plot(label="Sorting Visualization")
     final_output = gr.Textbox(label="Sorted Playlist", lines=10)
 
-    # run_sort yields (Figure, str) tuples, so outputs maps 1-to-1:
-    # index 0 → plot_output, index 1 → final_output
+
     sort_button.click(
         run_sort,
         inputs=[titles, artists, energies, durations, sort_key],
